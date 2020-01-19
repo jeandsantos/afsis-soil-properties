@@ -1,0 +1,471 @@
+---
+title: "AFSIS"
+author: "Jean Dos Santos"
+date: "18/01/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Overview
+
+Advances in rapid, low cost analysis of soil samples using infrared spectroscopy, georeferencing of soil samples, and greater availability of earth remote sensing data provide new opportunities for predicting soil functional properties at unsampled locations. Soil functional properties are those properties related to a soil’s capacity to support essential ecosystem services such as primary productivity, nutrient and water retention, and resistance to soil erosion. Digital mapping of soil functional properties, especially in data sparse regions such as Africa, is important for planning sustainable agricultural intensification and natural resources management.
+
+![](https://storage.googleapis.com/kaggle-competitions/kaggle/3966/media/overview-AfSIS-kaggle.PNG)
+
+Diffuse reflectance infrared spectroscopy has shown potential in numerous studies to provide a highly repeatable, rapid and low cost measurement of many soil functional properties. The amount of light absorbed by a soil sample is measured, with minimal sample preparation, at hundreds of specific wavebands across a range of wavelengths to provide an infrared spectrum (Fig. 1). The measurement can be typically performed in about 30 seconds, in contrast to conventional reference tests, which are slow and expensive and use chemicals.
+
+Conventional reference soil tests are calibrated to the infrared spectra on a subset of samples selected to span the diversity in soils in a given target geographical area. The calibration models are then used to predict the soil test values for the whole sample set. The predicted soil test values from georeferenced soil samples can in turn be calibrated to remote sensing covariates, which are recorded for every pixel at a fixed spatial resolution in an area, and the calibration model is then used to predict the soil test values for each pixel. The result is a digital map of the soil properties.
+
+This competition asks you to predict 5 target soil functional properties from diffuse reflectance infrared spectroscopy measurements.
+
+
+# Data
+
+## File descriptions
+
+- `train.csv` - the training set has 1158 rows.
+- `test.csv` - the test set has 728 rows.
+- `sample_submission.csv` - all zeros prediction, serving as a sample submission file in the correct format.
+
+## Data fields
+
+`SOC`, `pH`, `Ca`, `P`, `Sand` are the five target variables for predictions. The data have been monotonously transformed from the original measurements and thus include negative values. 
+
+- `PIDN`: unique soil sample identifier
+- `SOC`: Soil organic carbon
+- `pH`: pH values
+- `Ca`: Mehlich-3 extractable Calcium
+- `P`: Mehlich-3 extractable Phosphorus
+- `Sand`: Sand content 
+- `m7497.96` - `m599.76`: There are 3,578 mid-infrared absorbance measurements. For example, the "m7497.96" column is the absorbance at wavenumber 7497.96 cm-1. We suggest you to remove spectra CO2 bands which are in the region m2379.76 to m2352.76, but you do not have to.
+- `Depth`: Depth of the soil sample (2 categories: "Topsoil", "Subsoil")
+
+We have also included some potential spatial predictors from remote sensing data sources. Short variable descriptions are provided below and additional descriptions can be found at AfSIS data. The data have been mean centered and scaled.
+
+- `BSA`: average long-term Black Sky Albedo measurements from MODIS satellite images (BSAN = near-infrared, BSAS = shortwave, BSAV = visible)
+- `CTI`: compound topographic index calculated from Shuttle Radar Topography Mission elevation data
+- `ELEV`: Shuttle Radar Topography Mission elevation data
+- `EVI`: average long-term Enhanced Vegetation Index from MODIS satellite images.
+- `LST`: average long-term Land Surface Temperatures from MODIS satellite images (LSTD = day time temperature, LSTN = night time temperature)
+- `Ref`: average long-term Reflectance measurements from MODIS satellite images (Ref1 = blue, Ref2 = red, Ref3 = near-infrared, Ref7 = mid-infrared)
+- `Reli`: topographic Relief calculated from Shuttle Radar Topography mission elevation data
+- `TMAP` & `TMFI`: average long-term Tropical Rainfall Monitoring Mission data (TMAP = mean annual precipitation, TMFI = modified Fournier index)
+
+## BART Example
+
+An example model using Bayesian Additive Regression Trees can be found [here](http://afsiskaggle.qed.ai/).
+
+
+## Why not more data?
+
+We will not introduce additional data (e.g. georeference) at this stage of the competition. We think that would be confusing (to us), as we would really like to find out how predictive the spectral methods are/would be when they are applied in new places and/or at different points in time by data science experts such as yourselves. Subsequent Kaggle competitions may focus on explicitly spatial and or space-time predictions.
+
+## Background on data set creation
+
+There have been a number of questions regarding why and how the data were ordered in the training and test sets. As some of you have surmised there is certainly geographical clustering in this dataset. This is due to the spatially stratified multilevel sampling design that was used to assemble the data. The following is an abbreviated version of how this came about.
+
+When the Africa Soil Information Service (AfSIS) project started in 2009, we were faced with the enormous logistical task of obtaining a representative sample covering ~18.1 million km2 of the non-desert portion of Africa, including Madagascar, that could be used as a baseline for monitoring soil and other ecosystem properties.
+
+The way we chose to go about this was to select 60, 10 × 10 km sized “Sentinel Landscapes”, stratified by the major Koeppen-Geiger climate zones of Africa, excluding the true deserts and some of the African countries which we were not allowed to work in at the time, due to security reasons.
+
+Within each of the 60 Sentinel Landscapes AfSIS field teams sampled 16, 1 km2 “Sampling Clusters” (1 km2 circular areas) with 10, 1000 m2, randomly located circular “Sampling Plots”.
+
+Topsoil (0-20 cm) and subsoil (20-50 cm) samples were subsequently recovered by physically mixing core subsamples from 4 locations within each Sampling Plot. Hence the intent was to obtain a representative multilevel/multistage sample consisting of:
+
+- 60 Sentinel Landscapes
+- 16 Sampling Clusters per Sentinel Landscape
+- 10 Sampling Plots per Sampling Cluster
+- 2 composite Soil Samples (topsoil & subsoil) per Sampling Plot
+
+Multiply those numbers and you obtain the intended number of composite soil samples (19,200) that were to be collected in the field over a 4-year period between 2009-2012.
+
+To achieve this target, we pre-generated appropriately randomized GPS coordinates for every Sampling Plot and, AfSIS field teams then navigated to (most) of those spots on the map to collect samples (insert n/N Sampling Plots).
+
+As might be expected with an exercise of this magnitude, the actual total number of soil samples in this dataset is somewhat smaller than intended, as some locations were either completely inaccessible by 4WD vehicle and/or on foot or that had soil depth restrictions that prevented the field teams from recovering physical samples.
+
+All physically recovered samples went into our lab (in Nairobi) to be characterized with the MIR spectral measurements that you are currently using. The potential spatial predictors, which cover the entire African continent (and beyond), were derived from NASA remote sensing data missions.
+
+A 10% subsample of all the soils that were measured with the MIR method, subsequently went on to be characterized with more reference measurements.
+
+“Reference measurements” are much more expensive (potentially hundreds of U$ per sample) and time-consuming. The other 90% of samples that were not characterized with “reference” methods have been physically archived, so that we can potentially retrieve those for calibrating new analytical methods and/or validating old methods.
+
+What is posted for this Kaggle is the complete spectral + reference dataset that we have currently, subject to the sampling procedures described above. The training and test data have been split along Sentinel Landscape levels because we are primarily interested in predicting soil properties at new Sentinel Landscapes.
+
+
+# Installing and loading packages
+
+```{r}
+install.packages("pacman", quiet = TRUE, verbose = FALSE)
+library(pacman, quietly = TRUE, verbose = FALSE)
+
+pacman::p_load(caret, tidyverse, tidyselect, janitor, install = TRUE, update = FALSE)
+```
+
+# Importing data
+
+```{r}
+training_data <- read_csv(unzip("train.zip"))
+test_data <- read_csv(unzip("test.zip"))
+
+dim(training_data)
+# names(training_data)
+
+soil_properties <- c("Ca", "P", "pH", "SOC", "Sand")
+CO2_bands <- names(training_data)[2656:2670]
+
+MIR_features <- names(training_data %>% dplyr::select(starts_with("m", ignore.case = FALSE)))
+MIR_wavelengths <- str_replace(MIR_features, "[m]", "") %>% as.numeric()
+
+numeric_features <- names(training_data[, sapply(training_data, is.numeric)])
+non_numeric_features <- names(training_data[, !sapply(training_data, is.numeric)])
+
+table(training_data$Depth)
+```
+
+
+Calculate first order derivative
+
+```{r}
+MIR_measurements <- training_data[, MIR_features]
+MIR_derivative <- matrix(rep(NA, (ncol(MIR_measurements)-1) * nrow(MIR_measurements)), nrow = nrow(MIR_measurements))
+
+for (i in 1:nrow(MIR_measurements)) {
+  
+  MIR_derivative[i, ] <- diff(t(MIR_measurements[i,]))
+
+}
+
+plot(x = 1:ncol(MIR_measurements), y = MIR_measurements[1, ], type="l")
+plot(x = 1:ncol(MIR_derivative), y = MIR_derivative[1, ], type="l")
+```
+
+
+# Exploratory Data Analysis
+
+Perform some exploratory analysis of the dataset to check for missing values, outliers and distribution of the target features.
+
+
+There are no missing values in the dataset.
+
+## Plot Spectra
+
+In order to have a better understanding of the absorbance data we will plot a few randomly selected spectra.
+
+```{r message=FALSE, warning=FALSE, message=FALSE}
+# Create subset of randomly selected samples
+set.seed(1)
+index <- sample(x = 1:nrow(training_data), size = 5, replace = F)
+data_subset <- training_data[index, MIR_features]
+
+data_subset <- data_subset %>% 
+  as.matrix() %>% 
+  t() %>% 
+  as.data.frame() %>% 
+  mutate(Channel = MIR_wavelengths) 
+
+data_subset %>% 
+  gather(key = "Sample", value = "Absorbance", -"Channel") %>% 
+  ggplot(aes(Channel, Absorbance, colour=Sample, group=Sample)) +
+    geom_line(size = 0.5, alpha = 0.8) + 
+    scale_color_brewer(palette = "Set1") +
+    # scale_x_discrete(labels = NULL) +
+    labs(title = "Absorption Profiles of 5 Random Samples", 
+         x = "Wavelength Index", 
+         y = "Absorption") +
+    theme_bw() +
+    theme()
+```
+
+
+
+```{r message=FALSE, warning=FALSE, message=FALSE}
+MIR_DER_subset <- MIR_derivative[index, ] %>% 
+  as.matrix() %>% 
+  t() %>% 
+  as.data.frame() %>% 
+  mutate(Channel = MIR_wavelengths[-1]) 
+  
+MIR_DER_subset[, -1] %>% 
+  gather(key = "Sample", value = "Absorbance", -"Channel") %>% 
+  ggplot(aes(Channel, Absorbance, colour=Sample, group=Sample)) +
+    geom_line(size = 0.5, alpha = 0.8) + 
+    scale_color_brewer(palette = "Set1") +
+    # scale_x_discrete(labels = NULL) +
+    labs(title = "First Dirative of Absorption Profiles of 5 Random Samples", 
+         x = "Wavelength Index", 
+         y = "Absorption") +
+    theme_bw() +
+    theme()
+```
+
+## Distribution of Target Variables
+
+The distribution of the target features can be viewed by plotting histograms:
+
+```{r message=FALSE, warning=FALSE, message=FALSE}
+training_data %>% 
+  dplyr::select(Ca, P, pH, SOC, Sand) %>% 
+  gather(key = "Component", value = "Value") %>% 
+  ggplot(mapping = aes(x = Value, fill = Component)) +
+    geom_histogram(bins = 30, alpha = 0.7) +
+    facet_grid(~Component) +
+    scale_fill_brewer(palette = "Set1") +
+    labs(title = "Distribution of Target Features",
+         subtitle = "Source: AFSIS",
+         y = "Count",
+         x = "x") +
+    theme_bw() + theme(legend.position = "none")
+
+training_data %>% 
+  dplyr::select(Ca, P, pH, SOC, Sand) %>% 
+  gather(key = "Component", value = "Value") %>% 
+  ggplot(mapping = aes(x = log10(Value), fill = Component)) +
+    geom_histogram(bins = 30, alpha = 0.9) +
+    facet_grid(~Component) +
+    scale_fill_brewer(palette = "Set1") +
+    labs(title = "Distribution of Target Features",
+         subtitle = "Source: AFSIS",
+         y = "Count",
+         x = "log10(x)") +
+    theme_bw() + theme(legend.position = "none")
+```
+
+
+```{r message=FALSE, warning=FALSE, message=FALSE}
+# install.packages("knitr", verbose = F, quiet = T)
+# install.packages("kableExtra", verbose = F, quiet = T)
+library(knitr, quietly = T, verbose = F)
+library(kableExtra, quietly = T, verbose = F)
+
+# Calculate summary statistics of target features
+training_data %>% 
+  group_by(Ca, P, pH, SOC, Sand) %>%
+  select(Ca, P, pH, SOC, Sand) %>% 
+  gather(key = "Component", value = "Value") %>%
+  group_by(Component) %>%
+  summarise(Mean = mean(Value, na.rm = T) %>% round(2),
+            Median = median(Value, na.rm = T) %>% round(2),
+            `Standard Deviation` = sd(Value, na.rm = T) %>% round(2),
+            `Minimum` = min(Value, na.rm = T) %>% round(2),
+            `Maximum` = max(Value, na.rm = T) %>% round(2)
+            ) %>% 
+  kable() %>% kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive", full_width = F)) # Create HTML table
+```
+
+
+## Correlations
+
+We can calculate and plot the correlations between each channel and the quantity of fat, protein and water. This should provide a better understanding of which absorbance channels are most relevant for each target feature.
+
+```{r}
+df <- data.frame(x1 = rnorm(100), x2 = rnorm(100),a = rnorm(100), b = rnorm(100), c = rnorm(100))
+abc <- c("a", "b", "c")
+x <- c("x1", "x2")
+
+# R_Squared_values <- matrix(rep(NA, length(abc)*length(x)), ncol = length(x)) %>% data.frame()
+
+R_Squared_values <- data.frame()
+
+for (i in abc) {
+  for(j in x){
+    
+    R_Squared_values[i, j] <- cor(x = df[, j], y = df[,i])
+    
+  }
+}
+
+R_Squared_values
+```
+
+
+
+```{r fig.height=10, fig.width=5, message=FALSE, warning=FALSE}
+library(gridExtra, quietly = T, verbose = F)
+
+R_Squared_values <- data.frame()
+
+for (i in soil_properties) {
+  for(j in MIR_features){
+    
+    R_Squared_values[i, j] <- cor(x = training_data[, j], y = training_data[,i])
+    
+  }
+}
+
+R_Squared_values
+
+plotList <- list()
+
+for (i in soil_properties) {
+  
+  g <- ggplot(mapping = aes(x = R_Squared_values[i, ], y = R_Squared_values[i, ], col = R_Squared_Water)) +
+    geom_line(size = 1) +
+    labs(title = paste0("R-squared of ", i, " for each Channel"),
+         x = "Wavelength",
+         y = "R-squared"
+         ) +
+  scale_color_continuous(low = "#fee0d2", high = "#a50f15") +
+  theme_bw() +
+  theme(legend.position = "none")
+  
+  plotList[[i]] = g
+  
+}
+
+g_Water <- ggplot(mapping = aes(x = 1:length(R_Squared_Water), y = R_Squared_Water, col = R_Squared_Water)) +
+  geom_line(size = 1) +
+  labs(title = "R-squared of Water Content for each Channel",
+       x = "Wavelength Index",
+       y = "R-squared"
+       ) +
+  scale_color_continuous(low = "#fee0d2", high = "#a50f15") +
+  theme_bw() +
+  theme(legend.position = "none")
+
+g_Fat <- ggplot(mapping = aes(x = 1:length(R_Squared_Fat), y = R_Squared_Fat, col = R_Squared_Fat)) +
+  geom_line(size = 1) +
+  labs(title = "R-squared of Fat Content for each Channel",
+       x = "Wavelength Index",
+       y = "R-squared"
+       ) +
+  scale_color_continuous(low = "#fee0d2", high = "#a50f15") +
+  theme_bw() +
+  theme(legend.position = "none")
+
+g_Protein <- ggplot(mapping = aes(x = 1:length(R_Squared_Protein), y = R_Squared_Protein, col = R_Squared_Protein)) +
+  geom_line(size = 1) +
+  labs(title = "R-squared of Protein Content for each Channel",
+       x = "Wavelength Index",
+       y = "R-squared"
+       ) +
+  scale_color_continuous(low = "#fee0d2", high = "#a50f15") +
+  theme_bw() +
+  theme(legend.position = "none")
+
+grid.arrange(g_Water, g_Fat, g_Protein)
+
+rm(R_Squared_Water, R_Squared_Fat, R_Squared_Protein, g_Water, g_Fat, g_Protein) # Remove obsolete objects
+```
+
+***
+
+# Data Pre-processing
+
+## Creating a training and test set
+
+We will randomly select 75% of the samples from the data for the training set and use the remaining 25% for the test set.
+
+```{r fig.height=6, fig.width=5}
+set.seed(1) 
+training_index <- createDataPartition(y = training_data$Fat, p = 0.75)[[1]]
+training_set <- training_data[training_index, ]
+test_set <- training_data[-training_index, ]
+
+# Check distributtion of strength on training set
+par(mfrow = c(3, 2))
+hist(training_set$Water, main = "Water: Training Set", xlab = "Water Content (%)", freq = FALSE)
+hist(test_set$Water, main = "Water: Test Set", xlab = "Water Content (%)", freq = FALSE)
+
+hist(training_set$Fat, main = "Fat: Training Set", xlab = "Fat Content (%)", freq = FALSE)
+hist(test_set$Fat, main = "Fat: Test Set", xlab = "Fat Content (%)", freq = FALSE)
+
+hist(training_set$Protein, main = "Protein: Training Set", xlab = "Protein Content (%)", freq = FALSE)
+hist(test_set$Protein, main = "Protein: Test Set", xlab = "Protein Content (%)", freq = FALSE)
+
+```
+
+The training set contains `r nrow(training_set)` samples and the test set contains `r nrow(test_set)` samples.
+
+The distribution of water, fat and protein contents are similar on both the training and test set.
+
+***
+
+## Create folds
+
+Parameter tuning and selection of our models will be done using repeated 10-fold cross-validation. Each round of cross-validation will be repeated 3 times. 
+
+```{r message=FALSE, warning=FALSE, message=FALSE}
+# Training Options
+set.seed(1)
+train_control <- caret::trainControl(method = "repeatedcv", number = 10, repeats = 3, verboseIter = FALSE, returnData = FALSE) 
+```
+
+# Model Training
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
